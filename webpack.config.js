@@ -1,5 +1,4 @@
 const path = require('path');
-const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = [{
     name: 'playground',
@@ -30,11 +29,6 @@ module.exports = [{
             }
         ]
     },
-    plugins: [
-        new CopyPlugin([
-            { from: 'src/js', to: 'js' }
-        ])
-    ],
     performance: {
         maxEntrypointSize: 512000,
         maxAssetSize: 512000

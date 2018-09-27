@@ -47,7 +47,7 @@ files:
 
 
 scripts:
-    clean: 'rimraf dist bin test/coverage docs/js/playground.bundle.*;'
+    clean: 'rimraf dist bin test/coverage test/test-results.xml docs/.vuepress/public/js/playground.bundle.*;'
     build: "
         npm run devbuild;
         cd dist;
@@ -173,7 +173,6 @@ devDependencies:
     'webpack-closure-compiler': '2.x'
     'babel-loader': '8.0.x'
     'source-map-loader': '0.2.x'
-    'copy-webpack-plugin': '4.5.x'
 
     '@babel/node': '7.0.x'
     '@babel/cli': '7.1.x'
