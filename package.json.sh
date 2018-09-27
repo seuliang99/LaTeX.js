@@ -164,7 +164,7 @@ devDependencies:
 
     ### docs
 
-    'vuepress': '0.14.x'
+    'vuepress': '1.0.0-alpha.1'
 
     ### bundling
 
