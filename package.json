@@ -107,7 +107,7 @@
     "slugify": "1.3.x",
     "puppeteer": "1.11.x",
     "pixelmatch": "4.0.x",
-    "nyc": "13.x",
+    "nyc": "^13.2.0",
     "codecov": "3.x"
   },
   "repository": {
