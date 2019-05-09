@@ -110,7 +110,7 @@
     "puppeteer-firefox": "0.x",
     "pixelmatch": "4.0.x",
     "nyc": "13.x",
-    "codecov": "3.x"
+    "codecov": "3.3.0"
   },
   "repository": {
     "type": "git",
