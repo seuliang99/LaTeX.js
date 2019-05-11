@@ -8,6 +8,8 @@
 
 // main rule, entry into the parser
 // parses a full LaTeX document, or just the contents of the document environment; returns the generator
+// 解析器主入口
+// 解析整个latex文档,或者文档环境中的内容,并返回html生成器
 latex =
     &with_preamble
     (skip_all_space escape (&is_hvmode / &is_preamble) macro)*
@@ -21,6 +23,7 @@ latex =
     /
     !with_preamble
     // if no preamble was given, start default documentclass
+    // 如果没有文档类型说明,开始默认的文档类型
     &{ g.macro("documentclass", [null, g.documentClass, null]); return true; }
     document
     EOF
@@ -28,6 +31,7 @@ latex =
 
 
 // preamble starts with P macro, then only HV and P macros in preamble
+// 前导码以P宏开头，前导码中只有HV和P宏
 with_preamble =
     skip_all_space escape &is_preamble
 
@@ -39,16 +43,18 @@ end_doc =
 
 
 // parses everything between \begin{document} and \end{document}; returns the generator
+// 解析 \begin {document}和 \end {document}之间的所有内容; 返回html生成器
 document =
     & { g.startBalanced(); g.enterGroup(); return true; }
-    skip_all_space            // drop spaces at the beginning of the document
+    skip_all_space            // drop spaces at the beginning of the document 删除文档开头的空格
     pars:paragraph*
-    skip_all_space            // drop spaces at the end of the document
+    skip_all_space            // drop spaces at the end of the document 删除文档末尾的空格
     {
         g.exitGroup();
         g.isBalanced() || error("groups need to be balanced!");
         var l = g.endBalanced();
         // this error should be impossible, it's just to be safe
+        // 这个错误应该是不可能的，只是为了安全
         l == 1 && g.isBalanced() || error("grammar error: " + l + " levels of balancing are remaining, or the last level is unbalanced!");
 
         g.createDocument(pars);
@@ -74,6 +80,7 @@ paragraph =
 
 
 // here, an empty line or \par is just a linebreak - needed in some macro arguments
+// 这里，空行或\par只是一个换行符 - 在某些宏参数中需要
 paragraph_with_linebreak =
     text
     / vmode_macro
@@ -81,6 +88,7 @@ paragraph_with_linebreak =
 
 
 // a line in restricted horizontal mode
+// 严格水平模式下的一条线
 line =
     linebreak                                   { return undefined; }
     / break                                     { return g.createText(g.sp); }
@@ -100,13 +108,14 @@ text "text" =
     / math
 
     // groups
-    / begin_group                             & { g.enterGroup(true); return true; } // copy attributes
+    / begin_group                             & { g.enterGroup(true); return true; } // copy attributes 复制属性
       s:space?                                  { return g.createText(s); }
-    / end_group                               & { if (!g.isBalanced()) { g.exitGroup(); return true; } } // end group only in unbalanced state
+    / end_group                               & { if (!g.isBalanced()) { g.exitGroup(); return true; } } // end group only in unbalanced state 仅在非平衡状态下结束组
       s:space?                                  { return g.createText(s); }
 
 
 // this rule must always return a string
+// 此规则必须始终返回一个字符串
 primitive "primitive" =
       char
     / space !unskip_macro                       { return g.sp; }
@@ -116,6 +125,7 @@ primitive "primitive" =
     / quotes
     / left_br
                                               // a right bracket is only allowed if we are in an open (unbalanced) group
+                                              //只有当我们处于开放（非平衡）组时，才允许使用右括号
     / b:right_br                              & { return !g.isBalanced() } { return b; }
     / nbsp
     / ctrl_space
@@ -128,11 +138,12 @@ primitive "primitive" =
 
 
 /**********/
-/* macros */
+/* macros 宏*/
 /**********/
 
 
 // macros that work in horizontal and vertical mode (those that basically don't produce text)
+// 在水平和垂直模式下工作的宏（那些宏基本上不产生文本）
 hv_macro =
     escape
     (
@@ -143,6 +154,7 @@ hv_macro =
 
 
 // macros that only work in horizontal mode (include \leavevmode)
+// 仅在水平模式下工作的宏（包括\leavevmode）
 hmode_macro =
     hv_macro
   /
@@ -158,13 +170,15 @@ hmode_macro =
 
     / verb
 
-    / &is_preamble only_preamble            // preamble macros are not allowed
-    / !begin !end !is_vmode unknown_macro   // now we have checked hv-macros and h-macros - if it's not a v-macro it is undefined
+    / &is_preamble only_preamble            // preamble macros are not allowed 不允许使用前导码宏
+    / !begin !end !is_vmode unknown_macro   // now we have checked hv-macros and h-macros - if it's not a v-macro it is undefined 
+                                            //现在我们检查了hv-macros和h-macros  - 如果它不是v-macro它是未定义的
     )
     { return m; }
 
 
 // macros that only work in vertical mode (include \par or check for \ifvmode)
+// 仅在垂直模式下工作的宏（包括\par或检查\ifvmode）
 vmode_macro =
     skip_all_space
     hv_macro
@@ -225,7 +239,7 @@ unknown_macro =
 
 
 /************************/
-/* macro argument rules */
+/* macro argument rules 宏参数规则*/
 /************************/
 
 
@@ -233,6 +247,7 @@ identifier "identifier" =
     $char+
 
 // key can contain pretty much anything but = and ,
+// key 除了 = 和 , 之外几乎可以包含任何东西
 key =
     $(char / digit / sp / [-$&_/@] / ![=,] utf8_char)+
 
@@ -331,6 +346,7 @@ length_unit     =   _ u:("sp" / "pt" / "px" / "dd" / "mm" / "pc" / "cc" / "cm" /
                     { return u; }
 
   // TODO: should be able to use variables and maths: 2\parskip etc.
+  // TODO：应该能够使用变量和数学：2 \parskip等。
 length          =   l:float u:length_unit (plus float length_unit)? (minus float length_unit)?
                     { return new g.Length(l, u); }
 
@@ -374,6 +390,7 @@ color_group     =   _ begin_group
 
 
 // picture coordinates and vectors
+// 图片坐标和向量
 
 // float or length
 coordinate      =   _ c:(length / f:float { return g.length("unitlength").mul(f) }) _
@@ -414,11 +431,16 @@ url_group       =   _ begin_group _
 // {<LaTeX code/text>}
 //
 // group balancing: groups have to be balanced inside arguments, inside environments, and inside a document.
+// 组平衡：组必须在参数，内部环境和文档内部进行平衡
 // startBalanced() is used to start a new level inside of which groups have to be balanced.
+// startBalanced（）用于启动必须平衡组的新级别。
 //
 // In the document and in environments, the default state is unbalanced until end of document or environment.
+// 在文档和环境中，默认状态是不平衡的，直到文档或环境结束。
 // In an argument, the default state is balanced (so that we know when to take } as end of argument),
+// 在一个参数中，默认状态是平衡的（因此我们知道何时采用}作为参数的结尾），
 // so first enter the group, then start a new level of balancing.
+// 所以首先进入组，然后开始一个新的平衡水平。
 arg_group       =   _ begin_group      & { g.enterGroup(); g.startBalanced(); return true; }
                         s:space?
                         p:paragraph_with_linebreak*
@@ -434,10 +456,12 @@ arg_group       =   _ begin_group      & { g.enterGroup(); g.startBalanced(); re
 
 
 // restricted horizontal material
+// 限制水平材料
 horizontal      =   l:line*
                     { return g.createFragment(l); }
 
 // restricted horizontal mode group
+// 受限水平模式组
 arg_hgroup      =   _ begin_group      & { g.enterGroup(); g.startBalanced(); return true; }
                         s:space?
                         h:horizontal
@@ -463,7 +487,7 @@ opt_group       =   _ begin_optgroup   & { g.enterGroup(); g.startBalanced(); re
 
 
 
-// calc expressions //
+// calc expressions 计算表达式//
 
 
 // \value{counter}
@@ -509,7 +533,7 @@ num_expr        =   _ head:num_term tail:(_ ("+" / "-") _ num_term)* _
 
 
 
-// xcolor expressions //
+// xcolor expressions xcolor表达式//
 
 color           = (c_name / c_ext_expr / c_expr) func_expr*
 
@@ -561,6 +585,7 @@ model_list      = (core_model ":")? color_model ("/" color_model)*
 
 
 // column spec for tables like tabular
+// 表格的列规范，如tabular
 columns =
     begin_group
         s:column_separator*
@@ -597,11 +622,14 @@ column_separator =
 
 
 // **** macros the parser has to know about due to special parsing that is neccessary **** //
+// **** 宏是解析器必须知道的，因为需要进行特殊的解析 ****//
 
 
 // spacing macros
+// 间隔宏
 
 // vertical
+// 垂直
 vspace_hmode    =   "vspace" "*"?   l:length_group      { return g.createVSpaceInline(l); }
 vspace_vmode    =   "vspace" "*"?   l:length_group      { return g.createVSpace(l); }
 
@@ -609,13 +637,15 @@ smbskip_hmode   =   s:$("small"/"med"/"big")"skip" !char _ { return g.createVSpa
 smbskip_vmode   =   s:$("small"/"med"/"big")"skip" !char _ { return g.createVSpaceSkip(s + "skip"); }
 
 //  \\[length] is defined in the linebreak rule further down
-
+// \\ [length]在换行符规则中进一步定义
 
 
 
 // verb - one-line verbatim text
+// verb - 一行逐字文字
 
 // TODO: this should use the current font size!
+// TODO：这应该使用当前的字体大小！
 verb            =   "verb" s:"*"? _ !char
                     b:.
                         v:$(!nl t:. !{ return b == t; })*
@@ -632,11 +662,12 @@ verb            =   "verb" s:"*"? _ !char
 
 
 /****************/
-/* environments */
+/* environments 环境*/
 /****************/
 
 begin_env "\\begin" =
     // escape already eaten by macro rule
+    // escape 已经被宏规则吃掉了
     begin
     begin_group id:identifier end_group
     {
@@ -655,18 +686,25 @@ end_env "\\end" =
 
 // trivlists: center, flushleft, flushright, verbatim, tabbing, theorem
 // lists: itemize, enumerate, description, verse, quotation, quote, thebibliography
+// 列表：逐项列出，枚举，描述，诗歌，引文，引用，参考书目
 //
 // both, lists and trivlists, add a \par at their beginning and end, but do not indent
+// both，lists 和 trivlists，在开头和结尾添加\par，但不要缩进
 // if no other \par (or empty line) follows them.
+// 如果没有其他\par（或空行）跟随它们。
 //
 // all other environments are "inline" environments, and those indent
+// 所有其他环境都是“内联”环境，那些缩进也是
 
 h_environment =
     id:begin_env
         macro_args                                          // parse macro args (which now become environment args)
+                                                            //解析宏args（现在变成环境args）
         node:( &. { return g.macro(id, g.endArgs()); })     // then execute macro with args without consuming input
+                                                            //然后用args执行宏而不消耗输入
         sb:(s:space? {return g.createText(s); })
         p:paragraph_with_linebreak*                         // then parse environment contents (if macro left some)
+                                                            //然后解析环境内容（如果宏留下一些）
     end_id:end_env se:(s:space? {return g.createText(s); })
     {
         var end = g.end(id, end_id);
@@ -674,6 +712,10 @@ h_environment =
         // if nodes are created by macro, add content as children to the last element
         // if node is a text node, just add it
         // potential spaces after \begin and \end have to be added explicitely
+        
+        // 如果节点是由宏创建的，则将内容作为子节点添加到最后一个元素
+        // 如果node是文本节点，只需添加它
+        // 必须明确地添加\ begin和\ end之后的潜在空格
 
         var pf = g.createFragment(p);
         if (pf && node && node.length > 0 && node[node.length - 1].nodeType === 1) {
@@ -682,7 +724,7 @@ h_environment =
             return g.createFragment(node, end, se);
         }
 
-        return g.createFragment(node, sb, pf, end, se);     // use pf, fragments in p are now empty!!
+        return g.createFragment(node, sb, pf, end, se);     // use pf, fragments in p are now empty!! 使用pf，p中的片段现在是空的!!
     }
 
 
@@ -690,14 +732,20 @@ h_environment =
 environment =
     id:begin_env  !{ g.break(); }
         macro_args                                          // parse macro args (which now become environment args)
+                                                            // 解析宏args（现在变成环境args）
         node:( &. { return g.macro(id, g.endArgs()); })     // then execute macro with args without consuming input
+                                                            //然后用args执行宏而不消耗输入
         p:paragraph*                                        // then parse environment contents (if macro left some)
+                                                            //然后解析环境内容（如果宏留下一些）
     end_id:end_env
     {
         var end = g.end(id, end_id);
 
         // if nodes are created by macro, add content as children to the last element
         // if node is a text node, just add it
+        
+        //如果节点是由宏创建的，则将内容作为子节点添加到最后一个元素
+        //如果node是文本节点，只需添加它
 
         var pf = g.createFragment(p);
         if (pf && node && node.length > 0 && node[node.length - 1].nodeType === 1) {
@@ -712,6 +760,7 @@ environment =
 
 
 // lists: items, enumerated items
+// 列出：项目，枚举项目
 
 
 item =
@@ -719,6 +768,7 @@ item =
     { return og; }
 
 // items without a counter
+// items 没有计数器
 items =
     (
         (skip_all_space hv_macro)*
@@ -733,12 +783,16 @@ items =
     )*
 
 // enumerated items
+// 枚举类型
 enumitems =
     (
         (skip_all_space hv_macro)*
         label:(label:item {
             // null is no opt_group (\item ...)
             // undefined is an empty one (\item[] ...)
+            // null是没有opt_group（\ item ...）
+            // undefined是空的（\ item [] ......）
+            
             if (label === null) {
                 var itemCounter = "enum" + g.roman(g.counter("@enumdepth"));
                 var itemId = "item-" + g.nextId();
@@ -754,7 +808,7 @@ enumitems =
                 node: label
             };
         })
-        pars:(!(item/end_env) p:paragraph { return p; })*   // collect paragraphs in pars
+        pars:(!(item/end_env) p:paragraph { return p; })*   // collect paragraphs in pars 收集pars中的段落
         {
             return {
                 label: label,
@@ -766,6 +820,7 @@ enumitems =
 
 
 // comment
+// 注释
 
 comment_env "comment environment" =
     "\\begin" _ "{comment}"
@@ -779,7 +834,7 @@ end_comment = "\\end" _ "{comment}"
 
 
 /**********/
-/*  math  */
+/*  math  数学*/
 /**********/
 
 
@@ -806,10 +861,10 @@ math_primitive =
     / sp / nl / linebreak / comment
 
 
-// shortcut
+// shortcut 快捷方式
 _                           = skip_space
 
-/* kind of keywords */
+/* kind of keywords 关键词 */
 
 begin                       = "begin"    !char _   {}
 end                         = "end"      !char _   {}
@@ -824,6 +879,7 @@ endinput                    = "endinput" !char _   .*
 
 
 /* syntax tokens - TeX's first catcodes that generate no output */
+// 语法标记 -  TeX的第一个不生成输出的catcodes
 
 escape                      = "\\"                              { return undefined; }       // catcode 0
 begin_group                 = "{"                               { return undefined; }       // catcode 1
@@ -841,7 +897,7 @@ EOF             "EOF"       = !. / escape endinput
 
 
 
-/* space handling */
+/* space handling 空间处理 */
 
 nl              "newline"   = "\n" / "\r\n" / "\r"
                             / "\u2028" / "\u2029"               { return undefined; }       // catcode 5 (linux, os x, windows, unicode)
@@ -863,11 +919,15 @@ ctrl_space  "control space" = escape (&nl &break / nl / sp)     { return g.brsp;
 nbsp        "non-brk space" = "~"                               { return g.nbsp; }          // catcode 13 (active)
 
 break     "paragraph break" = ((skip_all_space escape par skip_all_space)+                  // a paragraph break is either \par embedded in spaces,
+                                                                                            // 段落是嵌入空格的\ par，
                                /                                                            // or
                                sp*
                                (nl comment* / comment+)                                     // a paragraph break is a newline...
+                                                                                            // 分节符是换行符...
                                ((sp* nl)+ / &end_doc / EOF)                                 // ...followed by one or more newlines, mixed with spaces,...
+                                                                                            // ...后跟一个或多个换行符，与空格混合，......
                                (sp / nl / comment)*                                         // ...and optionally followed by any whitespace and/or comment
+                                                                                            // ...并且可选地后跟任何空格和/或注释
                               )                                 { return true; }
 
 linebreak       "linebreak" = _ escape "\\" _ '*'? _
@@ -880,19 +940,22 @@ linebreak       "linebreak" = _ escape "\\" _ '*'? _
                               }
 
 // this should hold all macros that unskip (\\ is already in linebreak) [or add a new macro type?]
+// 这应该包含所有解压缩的宏（\\已经在换行符中）[或者添加一个新的宏类型？]
 unskip_macro                = _ escape ("put"/"newline") !char
 
 
-/* syntax tokens - LaTeX */
+/* syntax tokens 语法标记 - LaTeX */
 
 // Note that these are in reality also just text! I'm just using a separate rule to make it look like syntax, but
 // brackets do not need to be balanced.
+// 请注意，这些实际上也只是文字！我只是使用一个单独的规则使它看起来像语法，但是
+// 括号不需要平衡。
 
 begin_optgroup              = "["                               { return undefined; }
 end_optgroup                = "]"                               { return undefined; }
 
 
-/* text tokens - symbols that generate output */
+/* text tokens - symbols that generate output 文本标记 - 生成输出的符号 */
 
 char        "letter"        = c:[a-z]i                          { return g.character(c); }  // catcode 11
 digit       "digit"         = n:[0-9]                           { return g.character(n); }  // catcode 12 (other)
@@ -915,6 +978,7 @@ ctrl_sym    "control symbol"= escape c:[$%#&{}_\-,/@]           { return g.contr
 
 
 // returns a unicode char/string
+// 返回一个unicode char / string
 symbol      "symbol macro"  = escape name:identifier &{ return g.hasSymbol(name); } _
     {
         return g.symbol(name);
@@ -933,7 +997,7 @@ diacritic "diacritic macro" =
 
 
 
-/* TeX language */
+/* TeX language 语言*/
 
 // \symbol{}= \char
 // \char98  = decimal 98
@@ -969,12 +1033,14 @@ float "float value"     = f:$(
 
 
 // distinguish length/counter: if it's not a counter, it is a length
+// 区分长度/计数器：如果它不是计数器，则为长度
 the                     = "the" !char _ t:(
                             c:value &{ return g.hasCounter(c);} { return g.createText("" + g.counter(c)); }
                             / escape id:identifier _            { return g.theLength(id); }
                         )                                       { return t; }
 
 // logging
+// 记录
 logging                 = "showthe" !char _ (
                             c:value &{ return g.hasCounter(c);} { console.log(g.counter(c)); }
                             / escape l:identifier _             { console.log(g.length(l)); }
